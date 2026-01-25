@@ -1,0 +1,13 @@
+[project]
+name = "ch2anki"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "google-genai>=1.60.0",
+    "python-dotenv>=1.2.1",
+    "genanki>=0.13.0",
+    "g4f[all]>=6.9.9",
+    "pyinstaller>=6.18.0",
+]
