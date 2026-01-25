@@ -10,4 +10,5 @@ dependencies = [
     "genanki>=0.13.0",
     "g4f[all]>=6.9.9",
     "pyinstaller>=6.18.0",
+    "sv-ttk>=2.6.1",
 ]

@@ -10,6 +10,7 @@ from tkinter import ttk, messagebox, scrolledtext
 from g4f.client import ClientFactory
 import re
 import platform
+import sv_ttk
 
 auto_import = True
 
@@ -202,25 +203,25 @@ def launch_gui():
     input_label.pack(anchor=tk.W, pady=(0, 5))
 
     word_entry = ttk.Entry(main_frame, font=("Arial", 14))
-    word_entry.pack(fill=tk.X, pady=(0, 10))
+    word_entry.pack(fill=tk.X, pady=(0, 5))
     word_entry.focus()
 
     # Model Selection
     model_frame = ttk.Frame(main_frame)
-    model_frame.pack(fill=tk.X, pady=(0, 10))
+    model_frame.pack(fill=tk.X, pady=(5, 0))
     
     ttk.Label(model_frame, text="Select Model:").pack(side=tk.LEFT, padx=(0, 10))
     
-    model_var = tk.StringVar(value="openai-fast")
-    model_select = ttk.Combobox(model_frame, textvariable=model_var, values=["openai-fast", "gemini"], state="readonly")
+    model_var = tk.StringVar(value="gemini")
+    model_select = ttk.Combobox(model_frame, textvariable=model_var, values=["gemini", "openai-fast"], state="readonly")
     model_select.pack(side=tk.LEFT, fill=tk.X, expand=True)
 
     # Log Area
     log_label = ttk.Label(main_frame, text="Status Log:")
-    log_label.pack(anchor=tk.W, pady=(10, 5))
+    log_label.pack(anchor=tk.W, pady=(5, 0))
 
     log_area = scrolledtext.ScrolledText(main_frame, height=10, state='disabled', font=("Courier", 12))
-    log_area.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
+    log_area.pack(fill=tk.BOTH, expand=True, pady=(0, 0))
 
     def log_message(message):
         log_area.config(state='normal')
@@ -265,6 +266,7 @@ def launch_gui():
     # Bind Enter key
     root.bind('<Return>', lambda event: on_generate())
 
+    sv_ttk.set_theme("dark")
     root.mainloop()
 
 if __name__ == "__main__":
