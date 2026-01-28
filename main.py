@@ -107,7 +107,12 @@ def get_batch_data(words: list, model_name: str = "openai-fast"):
         print(f"Error fetching data from AI: {e}", file=sys.stderr)
         return None
 
-def create_anki_package(input_text: str, log_callback=print, model_name: str = "openai-fast"):
+def create_anki_package(
+    input_text: str,
+    log_callback=print,
+    model_name: str = "openai-fast",
+    deck_name: str = "Generated Chinese Cards",
+):
     """Generates an Anki package (.apkg) for the given word(s)."""
     # Split input by standard comma, Chinese comma, or newline
     words = [w.strip() for w in re.split(r'[,，\n]', input_text) if w.strip()]
@@ -117,7 +122,7 @@ def create_anki_package(input_text: str, log_callback=print, model_name: str = "
         return
 
     # Create Deck
-    deck = genanki.Deck(DECK_ID, 'Generated Chinese Cards')
+    deck = genanki.Deck(DECK_ID, deck_name)
     count = 0
     
     # Process in batches of 3
@@ -185,43 +190,77 @@ def launch_gui():
     """Launches a Tkinter GUI for the application."""
     root = tk.Tk()
     root.title("Chinese to Anki Generator")
-    root.geometry("500x400")
-    # photo = tk.PhotoImage(file=r"/Users/andy/Projects/ch2anki/icon-512.png")
-    # root.wm_iconphoto(False, photo)
+    root.geometry("600x650")  # Increased height for better layout
 
     # Style
     style = ttk.Style()
-    style.configure("TButton", font=("Arial", 12))
-    style.configure("TLabel", font=("Arial", 12))
+    style.configure("TButton", font=("Segoe UI", 12))  # Cross-platform friendly font
+    style.configure("TLabel", font=("Segoe UI", 11))
+    style.configure("Header.TLabel", font=("Segoe UI", 12, "bold"))
 
-    # Main Frame
+    # Main Container with padding
     main_frame = ttk.Frame(root, padding="20")
     main_frame.pack(fill=tk.BOTH, expand=True)
 
-    # Input Section
-    input_label = ttk.Label(main_frame, text="Enter Chinese Word(s):")
-    input_label.pack(anchor=tk.W, pady=(0, 5))
+    # --- Header ---
+    header_label = ttk.Label(main_frame, text="Generate Anki Cards", style="Header.TLabel")
+    header_label.pack(anchor=tk.W, pady=(0, 10))
 
-    word_entry = ttk.Entry(main_frame, font=("Arial", 14))
-    word_entry.pack(fill=tk.X, pady=(0, 5))
+    # --- Input Section ---
+    input_frame = ttk.LabelFrame(main_frame, text="Input", padding="10")
+    input_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
+
+    input_instruction = ttk.Label(input_frame, text="Enter Chinese words (one per line, or comma separated):")
+    input_instruction.pack(anchor=tk.W, pady=(0, 5))
+
+    word_entry = tk.Text(input_frame, height=8, font=("Arial", 14), wrap=tk.WORD)
+    word_entry.pack(fill=tk.BOTH, expand=True, pady=(0, 5))
+    
+    # Scrollbar for input
+    scrollbar = ttk.Scrollbar(input_frame, orient="vertical", command=word_entry.yview)
+    scrollbar.pack(side=tk.RIGHT, fill=tk.Y)  # Use pack inside frame, need to repack text to respect side? 
+    # Actually, let's repack to do it right:
+    word_entry.pack_forget()
+    scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+    word_entry.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+    word_entry['yscrollcommand'] = scrollbar.set
+
     word_entry.focus()
 
-    # Model Selection
-    model_frame = ttk.Frame(main_frame)
-    model_frame.pack(fill=tk.X, pady=(5, 0))
-    
-    ttk.Label(model_frame, text="Select Model:").pack(side=tk.LEFT, padx=(0, 10))
-    
-    model_var = tk.StringVar(value="gemini")
-    model_select = ttk.Combobox(model_frame, textvariable=model_var, values=["gemini", "openai-fast"], state="readonly")
-    model_select.pack(side=tk.LEFT, fill=tk.X, expand=True)
+    # --- Settings Section ---
+    settings_frame = ttk.LabelFrame(main_frame, text="Settings", padding="10")
+    settings_frame.pack(fill=tk.X, pady=(0, 10))
 
-    # Log Area
+    # Grid layout for settings
+    settings_frame.columnconfigure(1, weight=1)
+
+    # Deck Name
+    ttk.Label(settings_frame, text="Deck Name:").grid(row=0, column=0, sticky=tk.W, padx=(0, 10), pady=5)
+    deck_var = tk.StringVar(value="Generated Chinese Cards")
+    deck_entry = ttk.Entry(settings_frame, textvariable=deck_var, font=("Segoe UI", 11))
+    deck_entry.grid(row=0, column=1, sticky=tk.EW, pady=5)
+
+    # Model Selection
+    ttk.Label(settings_frame, text="AI Model:").grid(row=1, column=0, sticky=tk.W, padx=(0, 10), pady=5)
+    model_var = tk.StringVar(value="gemini")
+    model_select = ttk.Combobox(settings_frame, textvariable=model_var, values=["gemini", "openai-fast"], state="readonly", font=("Segoe UI", 11))
+    model_select.grid(row=1, column=1, sticky=tk.EW, pady=5)
+
+    # Auto Import Checkbox
+    auto_import_var = tk.BooleanVar(value=True)
+    auto_import_check = ttk.Checkbutton(settings_frame, text="Auto-open .apkg file after generation", variable=auto_import_var)
+    auto_import_check.grid(row=2, column=0, columnspan=2, sticky=tk.W, pady=(5, 0))
+
+    # --- Actions Section ---
+    action_frame = ttk.Frame(main_frame)
+    action_frame.pack(fill=tk.X, pady=(0, 10))
+
+    # Log Area (initially collapsed/small? No, visible is good)
     log_label = ttk.Label(main_frame, text="Status Log:")
     log_label.pack(anchor=tk.W, pady=(5, 0))
 
-    log_area = scrolledtext.ScrolledText(main_frame, height=10, state='disabled', font=("Courier", 12))
-    log_area.pack(fill=tk.BOTH, expand=True, pady=(0, 0))
+    log_area = scrolledtext.ScrolledText(main_frame, height=8, state='disabled', font=("Courier New", 11))
+    log_area.pack(fill=tk.BOTH, expand=True)
 
     def log_message(message):
         log_area.config(state='normal')
@@ -230,19 +269,33 @@ def launch_gui():
         log_area.config(state='disabled')
 
     def on_generate():
-        word = word_entry.get().strip()
+        # Get text from Text widget (1.0 to END-1c to avoid trailing newline)
+        input_text = word_entry.get("1.0", "end-1c").strip()
         selected_model = model_var.get()
-        if not word:
-            messagebox.showwarning("Input Error", "Please enter a word.")
+        selected_deck = deck_var.get().strip() or "Generated Chinese Cards"
+        
+        # Update global auto_import based on checkbox
+        global auto_import
+        auto_import = auto_import_var.get()
+
+        if not input_text:
+            messagebox.showwarning("Input Error", "Please enter at least one word.")
             return
 
         generate_btn.config(state=tk.DISABLED)
         word_entry.config(state=tk.DISABLED)
-        log_message("-" * 30)
+        # Clear log on new run? Optional. Let's add a separator.
+        log_message("\n" + "=" * 40)
+        log_message("Starting generation task...")
         
         def run_task():
             try:
-                create_anki_package(word, log_callback=log_message, model_name=selected_model)
+                create_anki_package(
+                    input_text,
+                    log_callback=log_message,
+                    model_name=selected_model,
+                    deck_name=selected_deck,
+                )
             except Exception as e:
                 log_message(f"Error: {e}")
             finally:
@@ -252,19 +305,17 @@ def launch_gui():
         threading.Thread(target=run_task, daemon=True).start()
 
     # Generate Button
-    generate_btn = ttk.Button(main_frame, text="Generate Flashcard", command=on_generate)
-    generate_btn.pack(fill=tk.X, pady=10)
+    generate_btn = ttk.Button(action_frame, text="Generate Flashcards", command=on_generate, style="Accent.TButton") # Accent style if supported by sv_ttk
+    generate_btn.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 5))
 
-    # Clear Button
-    def on_clear():
+    # Clear Log Button
+    def on_clear_log():
         log_area.config(state='normal')
         log_area.delete(1.0, tk.END)
         log_area.config(state='disabled')
-    clear_btn = ttk.Button(main_frame, text="Clear Log", command=on_clear)
-    clear_btn.pack(fill=tk.X)
-
-    # Bind Enter key
-    root.bind('<Return>', lambda event: on_generate())
+        
+    clear_btn = ttk.Button(action_frame, text="Clear Log", command=on_clear_log)
+    clear_btn.pack(side=tk.RIGHT, fill=tk.X, expand=False) # Smaller clear button
 
     sv_ttk.set_theme("dark")
     root.mainloop()
@@ -275,7 +326,8 @@ if __name__ == "__main__":
             launch_gui()
         else:
             input_word = sys.argv[1]
-            create_anki_package(input_word)
+            deck_name = sys.argv[2] if len(sys.argv) > 2 else "Generated Chinese Cards"
+            create_anki_package(input_word, deck_name=deck_name)
     else:
         # Default to GUI mode if no args provided
         launch_gui()
