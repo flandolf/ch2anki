@@ -74,6 +74,10 @@ def get_batch_data(words: list, model_name: str = "openai-fast"):
     - "pinyin": The pinyin with tone marks.
     - "meaning": Concise English definition.
     - "examples": HTML string with exactly 2 examples formatted EXACTLY like this: "<b>Example 1:</b> HANZI<br>(PINYIN)<br>ENGLISH<br><br><b>Example 2:</b> HANZI<br>(PINYIN)<br>ENGLISH".
+
+    CONTENT INSTRUCTIONS:
+    - If the input word is a single character, the examples MUST be common phrases or compound words containing that character (e.g. if word is "好", examples could be "你好", "美好").
+    - If the input word is a multi-character word, the examples should be sentences using the word.
     """
 
     try:
@@ -125,8 +129,8 @@ def create_anki_package(
     deck = genanki.Deck(DECK_ID, deck_name)
     count = 0
     
-    # Process in batches of 3
-    BATCH_SIZE = 3
+    # Process in batches of 10
+    BATCH_SIZE = 10
     
     for i in range(0, len(words), BATCH_SIZE):
         batch_words = words[i:i + BATCH_SIZE]
@@ -237,7 +241,7 @@ def launch_gui():
     # Deck Name
     ttk.Label(settings_frame, text="Deck Name:").grid(row=0, column=0, sticky=tk.W, padx=(0, 10), pady=5)
     deck_var = tk.StringVar(value="Generated Chinese Cards")
-    deck_entry = ttk.Entry(settings_frame, textvariable=deck_var, font=("Segoe UI", 11))
+    deck_entry = ttk.Combobox(settings_frame, textvariable=deck_var, values=["Generated Chinese Cards", "Most Frequent Chinese Characters"], font=("Segoe UI", 11))
     deck_entry.grid(row=0, column=1, sticky=tk.EW, pady=5)
 
     # Model Selection
