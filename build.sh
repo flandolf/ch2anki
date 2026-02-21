@@ -9,7 +9,7 @@ fi
 source .venv/bin/activate
 
 # 2. Run PyInstaller with the optional clean flag
-pyinstaller $CLEAN_ARG --onedir --windowed --icon=icon.ico --noconfirm main.py
+pyinstaller $CLEAN_ARG --onedir --windowed --icon=icon.icns --noconfirm main.py
 
 echo "---"
 echo "Build complete. Copy to /Applications folder? (y/n)"

@@ -3,7 +3,6 @@ import sys
 import os
 import tempfile
 import json
-import dotenv
 import genanki
 import threading
 import tkinter as tk
@@ -12,9 +11,45 @@ import re
 import platform
 import sv_ttk
 import requests
-auto_import = True
-    
-dotenv.load_dotenv()
+
+def get_config_dir():
+    app_name = "ch2anki"
+    system = platform.system()
+    if system == "Darwin":
+        return os.path.expanduser(f"~/Library/Application Support/{app_name}")
+    elif system == "Windows":
+        return os.path.join(os.environ.get('APPDATA', os.path.expanduser("~")), app_name)
+    else:
+        return os.path.expanduser(f"~/.config/{app_name}")
+
+CONFIG_FILE = os.path.join(get_config_dir(), "config.json")
+print(f"Config path: {CONFIG_FILE}")
+
+def load_config():
+    if os.path.exists(CONFIG_FILE):
+        try:
+            with open(CONFIG_FILE, 'r') as f:
+                c = json.load(f)
+                print(f"Loaded config: {c.keys()}")
+                return c
+        except Exception as e:
+            print(f"Error loading config: {e}", file=sys.stderr)
+            return {}
+    return {}
+
+def save_config(config):
+    try:
+        os.makedirs(os.path.dirname(CONFIG_FILE), exist_ok=True)
+        with open(CONFIG_FILE, 'w') as f:
+            json.dump(config, f, indent=4)
+        print("Config saved successfully.")
+    except Exception as e:
+        print(f"Error saving config: {e}", file=sys.stderr)
+
+# Load Initial Configuration
+initial_config = load_config()
+auto_import = initial_config.get("auto_import", True)
+
 # Anki Model Configuration
 # Unique IDs (generated randomly, keep consistent for deck updates)
 MODEL_ID = 1607392319
@@ -59,7 +94,7 @@ cn_model = genanki.Model(
 )
 
 
-def get_batch_data(words: list, model_name: str = "openai-fast"):
+def get_batch_data(words: list, model_name: str = "openai-fast", api_key: str = ""):
     """Fetch structured data for a list of words using g4f."""
     words_str = ", ".join(words)
     prompt = f"""
@@ -80,6 +115,14 @@ def get_batch_data(words: list, model_name: str = "openai-fast"):
     - If the input word is a multi-character word, the examples should be sentences using the word.
     """
 
+    # Resolve API Key
+    if not api_key:
+        # Try environment variable fallback or config
+        api_key = os.getenv('OPENROUTER_API') or load_config().get("api_key") or ""
+
+    if not api_key:
+        print("[ERROR] No API Key provided. Please set OPENROUTER_API env var or configure in GUI.", file=sys.stderr)
+        return None
     try:
         print(
             f"[DEBUG] Sending batch prompt for: {words_str} using model: {model_name}"
@@ -87,7 +130,7 @@ def get_batch_data(words: list, model_name: str = "openai-fast"):
         response = requests.post(
             url="https://openrouter.ai/api/v1/chat/completions",
             headers={
-                "Authorization": f"Bearer {os.getenv('OPENROUTER_API')}",
+                "Authorization": f"Bearer {api_key}",
                 "Content-Type": "application/json",
             },
             data=json.dumps(
@@ -128,8 +171,9 @@ def get_batch_data(words: list, model_name: str = "openai-fast"):
 def create_anki_package(
     input_text: str,
     log_callback=print,
-    model_name: str = "openai-fast",
+    model_name: str = "stepfun/step-3.5-flash:free",
     deck_name: str = "Generated Chinese Cards",
+    api_key: str = "",
 ):
     """Generates an Anki package (.apkg) for the given word(s)."""
     # Split input by standard comma, Chinese comma, or newline
@@ -152,7 +196,7 @@ def create_anki_package(
             f"Processing batch: {', '.join(batch_words)} using {model_name}..."
         )
 
-        results = get_batch_data(batch_words, model_name=model_name)
+        results = get_batch_data(batch_words, model_name=model_name, api_key=api_key)
 
         if not results:
             log_callback(f"Skipping batch {batch_words} (API error)")
@@ -212,6 +256,9 @@ def launch_gui():
     root = tk.Tk()
     root.title("Chinese to Anki Generator")
     root.geometry("650x550")
+
+    # Load persistent config
+    config = load_config()
 
     # Theme
     sv_ttk.set_theme("dark")
@@ -290,7 +337,7 @@ def launch_gui():
     ttk.Label(settings_tab, text="Deck Name:").grid(
         row=0, column=0, sticky=tk.W, padx=(0, 10), pady=10
     )
-    deck_var = tk.StringVar(value="Generated Chinese Cards")
+    deck_var = tk.StringVar(value=config.get("deck_name", "Generated Chinese Cards"))
     deck_entry = ttk.Combobox(
         settings_tab,
         textvariable=deck_var,
@@ -303,7 +350,7 @@ def launch_gui():
     ttk.Label(settings_tab, text="AI Model:").grid(
         row=1, column=0, sticky=tk.W, padx=(0, 10), pady=10
     )
-    model_var = tk.StringVar(value="stepfun/step-3.5-flash:free")
+    model_var = tk.StringVar(value=config.get("model", "stepfun/step-3.5-flash:free"))
     model_select = ttk.Combobox(
         settings_tab,
         textvariable=model_var,
@@ -313,7 +360,7 @@ def launch_gui():
     model_select.grid(row=1, column=1, sticky=tk.EW, pady=10)
 
     # Auto Import
-    auto_import_var = tk.BooleanVar(value=True)
+    auto_import_var = tk.BooleanVar(value=config.get("auto_import", True))
     auto_import_check = ttk.Checkbutton(
         settings_tab,
         text="Automatically open generated .apkg file",
@@ -333,7 +380,11 @@ def launch_gui():
     api_key_frame.grid(row=5, column=0, columnspan=2, sticky=tk.EW)
     api_key_frame.columnconfigure(0, weight=1)
     
-    api_key_var = tk.StringVar(value=os.getenv("OPENROUTER_API") or "")
+    api_key_val = config.get("api_key")
+    if not api_key_val:
+        api_key_val = os.getenv("OPENROUTER_API") or ""
+    
+    api_key_var = tk.StringVar(value=api_key_val)
     api_key_entry = ttk.Entry(
         api_key_frame, textvariable=api_key_var, font=("Segoe UI", 11), show="*"
     )
@@ -368,6 +419,38 @@ def launch_gui():
     clear_btn.pack(anchor=tk.E)
 
 
+    def save_current_settings(event=None):
+        settings = {
+            "deck_name": deck_var.get().strip(),
+            "model": model_var.get(),
+            "auto_import": auto_import_var.get(),
+            "api_key": api_key_var.get().strip()
+        }
+        save_config(settings)
+        # Optional: visual feedback in status bar?
+        try:
+             # Only update status if it's not currently running a generation task
+             if "Processing" not in status_var.get() and "Starting" not in status_var.get():
+                 status_var.set("Settings saved")
+        except Exception:
+            pass
+
+    def on_close():
+        save_current_settings()
+        root.destroy()
+    
+    # Bind settings changes to save automatically
+    deck_entry.bind("<<ComboboxSelected>>", save_current_settings)
+    deck_entry.bind("<FocusOut>", save_current_settings)
+    model_select.bind("<<ComboboxSelected>>", save_current_settings)
+    model_select.bind("<FocusOut>", save_current_settings)
+    auto_import_check.config(command=save_current_settings)
+    api_key_entry.bind("<FocusOut>", save_current_settings)
+    api_key_entry.bind("<Return>", save_current_settings)
+    api_key_entry.bind("<KeyRelease>", lambda event: save_current_settings())
+
+    root.protocol("WM_DELETE_WINDOW", on_close)
+
     # ==================== LOGIC ====================
 
     def log_message(message):
@@ -395,6 +478,7 @@ def launch_gui():
         input_text = word_entry.get("1.0", "end-1c").strip()
         selected_model = model_var.get()
         selected_deck = deck_var.get().strip() or "Generated Chinese Cards"
+        current_api_key = api_key_var.get().strip()
 
         global auto_import
         auto_import = auto_import_var.get()
@@ -402,6 +486,9 @@ def launch_gui():
         if not input_text:
             messagebox.showwarning("Input Error", "Please enter at least one word.")
             return
+
+        # Save settings explicitly before running
+        save_current_settings()
 
         generate_btn.config(state=tk.DISABLED)
         word_entry.config(state=tk.DISABLED)
@@ -421,6 +508,7 @@ def launch_gui():
                     log_callback=log_message,
                     model_name=selected_model,
                     deck_name=selected_deck,
+                    api_key=current_api_key,
                 )
             except Exception as e:
                 log_message(f"Error: {e}")
