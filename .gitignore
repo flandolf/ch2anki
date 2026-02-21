@@ -14,3 +14,6 @@ Thumbs.db
 *.apkg
 uv.lock
 main.spec
+
+# Obviously we don't want to commit our API key
+.env
